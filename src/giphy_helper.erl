@@ -9,7 +9,8 @@
 
 %% API
 -export([
-  uuid_v4/0
+  uuid_v4/0,
+  body/2
 ]).
 
 %% Creates a version 4 UUID string, which is randomly generated and looks
@@ -25,3 +26,12 @@ uuid_v4() ->
   DWithVariant = D bor 16#8000, % Insert variant == 1,0 as first two bits
   FormatString = "~8.16.0b-~4.16.0b-~4.16.0b-~4.16.0b-~12.16.0b",
   lists:flatten(io_lib:format(FormatString, [A, B, CWithVersion, DWithVariant, E])).
+
+%% Helper to peel the entire body out of a json payload and return it in a jiffy decoded map
+body(Request, Acc) ->
+  {ok, Body, Response} = case cowboy_req:read_body(Request) of
+    {ok, Data, Req} -> {ok, << Acc/binary, Data/binary >>, Req};
+    {more, Data, Req} -> body(Req, << Acc/binary, Data/binary >>)
+  end,
+  DecodedBody = jiffy:decode(Body, [return_maps]),
+  {ok, DecodedBody, Response}.
