@@ -6,7 +6,7 @@
 
 start(_Type, _Args) ->
 	Dispatch = cowboy_router:compile([
-		{'_', [{"/", hello_handler, []}]}
+		{'_', [{"/", gif_handler, []}]}
 	]),
 	{ok, _} = cowboy:start_clear(my_http_listener,
 		[{port, 8080}],
@@ -19,8 +19,7 @@ stop(_State) ->
 	ok.
 
 start_mnesia() ->
-	application:ensure_started(mnesia),
+	application:ensure_all_started(mnesia),
 	mnesia:create_schema([node()]),
 	giphy_table_mngr:create_tables(),
 	mnesia:start().
-
