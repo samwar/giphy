@@ -1,16 +1,20 @@
 %%%-------------------------------------------------------------------
 %%% @author Sam Warters
 %%% @doc
-%%%
+%%% Some helper functions for the giphy app including a way to quickly
+%%% seed some test data.
 %%% @end
 %%% Created : 27. Jan 2019 12:37
 %%%-------------------------------------------------------------------
 -module(giphy_helper).
 
+-include_lib("include/model/giphy_table_definitions.hrl").
+
 %% API
 -export([
   uuid_v4/0,
-  body/2
+  body/2,
+  seed_tables_for_testing/0
 ]).
 
 %% Creates a version 4 UUID string, which is randomly generated and looks
@@ -35,3 +39,12 @@ body(Request, Acc) ->
   end,
   DecodedBody = jiffy:decode(Body, [return_maps]),
   {ok, DecodedBody, Response}.
+
+%% A quick way to seed the mnesia tables for testing. Returns the UserUUID you'll need to retrieve and save gifs
+seed_tables_for_testing() ->
+  {ok, ok} = giphy_table_mngr:insert_user(<<"Samwar">>, <<"test">>, <<"samwar@gmail.com">>, <<"test_uuid">>),
+  {ok, User} = giphy_table_mngr:retrieve_user(<<"Samwar">>, <<"test">>, true),
+  UserUUID = User#user.uuid,
+  giphy_table_mngr:insert_gif(<<"https://media2.giphy.com/media/FiGiRei2ICzzG/giphy.gif">>, [<<"funny">>, <<"cat">>, <<"roomba">>], UserUUID),
+  giphy_table_mngr:insert_gif(<<"https://media0.giphy.com/media/feqkVgjJpYtjy/giphy.gif">>, [<<"bird">>, <<"zoom">>], UserUUID),
+  UserUUID.

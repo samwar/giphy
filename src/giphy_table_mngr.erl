@@ -15,7 +15,9 @@
 -export([
   create_tables/0,
   insert_user/3,
-  retrieve_user/2,
+  insert_user/4,
+  retrieve_user/3,
+  retrieve_user_by_uuid/1,
   insert_gif/3,
   retrieve_gifs/1
 ]).
@@ -35,31 +37,46 @@ create_tables() ->
   ]).
 
 insert_user(Username, Password, Email) ->
+  insert_user(Username, Password, Email, undefined).
+
+insert_user(Username, Password, Email, undefined) ->
+  insert_user(Username, Password, Email, list_to_binary(giphy_helper:uuid_v4()));
+insert_user(Username, Password, Email, UUID) ->
   User = #user{
     username = Username,
     password = base64:encode(Password),
     email = Email,
-    uuid = giphy_helper:uuid_v4()
+    uuid = UUID
   },
   Fun = fun() ->
     mnesia:write(User)
-        end,
+  end,
   normalize_return(mnesia:transaction(Fun)).
 
-retrieve_user(Username, Password) ->
+retrieve_user(Username, Password, AuthCheck) ->
   Fun = fun() ->
     Query = qlc:q([User || User <- mnesia:table(user),
       User#user.username == Username]),
     qlc:e(Query)
         end,
-  do_retrieve_user(mnesia:transaction(Fun), Password).
+  do_retrieve_user(mnesia:transaction(Fun), Password, AuthCheck).
 
-do_retrieve_user({atomic, []}, _Password) ->
+retrieve_user_by_uuid(UUID) ->
+  Fun = fun() ->
+    Query = qlc:q([User || User <- mnesia:table(user),
+      User#user.uuid == UUID]),
+    qlc:e(Query)
+  end,
+  do_retrieve_user(mnesia:transaction(Fun), undefined, false).
+
+do_retrieve_user({atomic, []}, _Password, _AuthCheck) ->
   {error, not_found};
-do_retrieve_user({atomic, [User]}, Password) ->
+do_retrieve_user({atomic, [User]}, Password, true) ->
   EncodedPassword = base64:encode(Password),
   authorized_user(EncodedPassword, User);
-do_retrieve_user({abort, _Reason} = Result, _Password) ->
+do_retrieve_user({atomic, [User]}, _Password, false) ->
+  {ok, User#user{password = undefined}};
+do_retrieve_user({abort, _Reason} = Result, _Password, _AuthCheck) ->
   Result.
 
 authorized_user(Password, #user{password = Password} = User) ->

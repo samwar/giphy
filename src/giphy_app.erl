@@ -6,13 +6,20 @@
 
 start(_Type, _Args) ->
 	Dispatch = cowboy_router:compile([
-		{'_', [{"/", gif_handler, []}]}
+		{'_', [
+			{"/", login_handler, []},
+			{"/login", login_handler, []},
+			{"/gifs/[:user_uuid]", gif_handler, []}
+		]}
 	]),
 	{ok, _} = cowboy:start_clear(my_http_listener,
 		[{port, 8080}],
 		#{env => #{dispatch => Dispatch}}
 	),
 	start_mnesia(),
+	lager:start(),
+	UUID = giphy_helper:seed_tables_for_testing(),
+	lager:info("~p", [UUID]),
 	giphy_sup:start_link().
 
 stop(_State) ->
