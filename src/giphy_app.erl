@@ -8,7 +8,8 @@ start(_Type, _Args) ->
 	Dispatch = cowboy_router:compile([
 		{'_', [
 			{"/", login_handler, []},
-			{"/login", login_handler, []},
+			{"/user", user_handler, []},
+			{"/search", search_handler, []},
 			{"/gifs/[:user_uuid]", gif_handler, []}
 		]}
 	]),
@@ -18,8 +19,7 @@ start(_Type, _Args) ->
 	),
 	start_mnesia(),
 	lager:start(),
-	UUID = giphy_helper:seed_tables_for_testing(),
-	lager:info("~p", [UUID]),
+	giphy_helper:seed_tables_for_testing(),
 	giphy_sup:start_link().
 
 stop(_State) ->

@@ -1,0 +1,2 @@
+ code:add_path("../deps/sync/ebin").
+ sync:go().

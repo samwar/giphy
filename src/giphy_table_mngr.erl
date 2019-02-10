@@ -18,7 +18,7 @@
   insert_user/4,
   retrieve_user/3,
   retrieve_user_by_uuid/1,
-  insert_gif/3,
+  insert_gif/4,
   retrieve_gifs/1
 ]).
 
@@ -30,9 +30,9 @@ create_tables() ->
     {attributes, record_info(fields, user)}
   ]),
 
-  % Create the gif table, build an index on user_uuid
+  % Create the gif table, build an index on giphy_uri and user_uuid
   mnesia:create_table(gif, [
-    {index, [user_uuid]},
+    {index, [giphy_uri, user_uuid]},
     {attributes, record_info(fields, gif)}
   ]).
 
@@ -44,7 +44,7 @@ insert_user(Username, Password, Email, undefined) ->
 insert_user(Username, Password, Email, UUID) ->
   User = #user{
     username = Username,
-    password = base64:encode(Password),
+    password = base64:encode(Password), % SUPER DUPER secure base64 encoding
     email = Email,
     uuid = UUID
   },
@@ -87,8 +87,9 @@ authorized_user(_EncodedPassword, #user{password = _Password}) ->
   {error, {unauthorized_user, <<"The user is unauthorized">>}}.
 
 
-insert_gif(GiphyURI, Categories, UserUUID) ->
+insert_gif(GifId, GiphyURI, Categories, UserUUID) ->
   Gif = #gif{
+    gif_id = GifId,
     giphy_uri = GiphyURI,
     categories = Categories,
     user_uuid = UserUUID
@@ -107,5 +108,7 @@ retrieve_gifs(UserUUID) ->
   normalize_return(mnesia:transaction(Fun)).
 
 normalize_return({atomic, Value}) -> {ok, Value};
-normalize_return({abort, Reason}) -> {error, Reason}.
+normalize_return({aborted, Reason}) ->
+  lager:error("Database error: ~p", [{error, Reason}]),
+  {error, Reason}.
 

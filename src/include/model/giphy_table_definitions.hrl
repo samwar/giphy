@@ -14,7 +14,8 @@
 }).
 
 -record(gif, {
-  giphy_uri  :: binary(), % Primary Key as deemed by mnesia implementation
+  gif_id     :: binary(), % Primary Key as deemed by mnesia implementation
+  giphy_uri  :: binary(), % Indexed
   categories :: binary(),
   user_uuid  :: binary()  % Indexed
 }).
