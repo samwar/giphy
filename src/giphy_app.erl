@@ -9,7 +9,7 @@ start(_Type, _Args) ->
 		{'_', [
 			{"/", login_handler, []},
 			{"/user", user_handler, []},
-			{"/search", search_handler, []},
+			{"/search/[:user_uuid]", search_handler, []},
 			{"/gifs/[:user_uuid]", gif_handler, []}
 		]}
 	]),

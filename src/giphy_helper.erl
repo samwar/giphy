@@ -34,13 +34,13 @@ uuid_v4() ->
 %% Helper to peel the entire body out of a json payload and return it in a jiffy decoded map
 body(Request, Acc) ->
   {ok, Body, Response} = case cowboy_req:read_body(Request) of
-    {ok, Data, Req} -> {ok, << Acc/binary, Data/binary >>, Req};
-    {more, Data, Req} -> body(Req, << Acc/binary, Data/binary >>)
+    {ok, Data, Req} -> {ok, <<Acc/binary, Data/binary>>, Req};
+    {more, Data, Req} -> body(Req, <<Acc/binary, Data/binary>>)
   end,
   DecodedBody = jiffy:decode(Body, [return_maps]),
   {ok, DecodedBody, Response}.
 
-  %% A quick way to seed the mnesia tables for testing. Returns the UserUUID you'll need to retrieve and save gifs
+%% A quick way to seed the mnesia tables for testing. Returns the UserUUID you'll need to retrieve and save gifs
 seed_tables_for_testing() ->
   {ok, ok} = giphy_table_mngr:insert_user(<<"test_uuid">>, <<"Samwar">>, <<"test">>, <<"samwar@gmail.com">>),
   {ok, User} = giphy_table_mngr:retrieve_user(<<"Samwar">>, <<"test">>, true),
