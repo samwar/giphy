@@ -7,10 +7,10 @@
 %%%-------------------------------------------------------------------
 
 -record(user, {
-  username  :: binary(), % Primary Key as deemed by mnesia implementation
+  uuid      :: binary(),  % Primary Key as deemed by mnesia implementation
+  username  :: binary(),  % Indexed
   password  :: binary(),
-  email     :: binary(),
-  uuid      :: binary()  % Indexed
+  email     :: binary()
 }).
 
 -record(gif, {

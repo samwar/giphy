@@ -19,14 +19,16 @@
   retrieve_user/3,
   retrieve_user_by_uuid/1,
   insert_gif/4,
-  retrieve_gifs/1
+  update_gif/2,
+  delete_gif/1,
+  retrieve_gifs_by_user_id/1
 ]).
 
 
 create_tables() ->
   % Create the user table, build an index on username and uuid
   mnesia:create_table(user, [
-    {index, [uuid]},
+    {index, [username]},
     {attributes, record_info(fields, user)}
   ]),
 
@@ -37,16 +39,16 @@ create_tables() ->
   ]).
 
 insert_user(Username, Password, Email) ->
-  insert_user(Username, Password, Email, undefined).
+  insert_user(undefined, Username, Password, Email).
 
-insert_user(Username, Password, Email, undefined) ->
-  insert_user(Username, Password, Email, list_to_binary(giphy_helper:uuid_v4()));
-insert_user(Username, Password, Email, UUID) ->
+insert_user(undefined, Username, Password, Email) ->
+  insert_user(list_to_binary(giphy_helper:uuid_v4()), Username, Password, Email);
+insert_user(UUID, Username, Password, Email) ->
   User = #user{
+    uuid = UUID,
     username = Username,
     password = base64:encode(Password), % SUPER DUPER secure base64 encoding
-    email = Email,
-    uuid = UUID
+    email = Email
   },
   Fun = fun() ->
     mnesia:write(User)
@@ -58,14 +60,12 @@ retrieve_user(Username, Password, AuthCheck) ->
     Query = qlc:q([User || User <- mnesia:table(user),
       User#user.username == Username]),
     qlc:e(Query)
-        end,
+  end,
   do_retrieve_user(mnesia:transaction(Fun), Password, AuthCheck).
 
 retrieve_user_by_uuid(UUID) ->
   Fun = fun() ->
-    Query = qlc:q([User || User <- mnesia:table(user),
-      User#user.uuid == UUID]),
-    qlc:e(Query)
+    mnesia:read({user, UUID})
   end,
   do_retrieve_user(mnesia:transaction(Fun), undefined, false).
 
@@ -86,7 +86,6 @@ authorized_user(Password, #user{password = Password} = User) ->
 authorized_user(_EncodedPassword, #user{password = _Password}) ->
   {error, {unauthorized_user, <<"The user is unauthorized">>}}.
 
-
 insert_gif(GifId, GiphyURI, Categories, UserUUID) ->
   Gif = #gif{
     gif_id = GifId,
@@ -96,15 +95,31 @@ insert_gif(GifId, GiphyURI, Categories, UserUUID) ->
   },
   Fun = fun() ->
     mnesia:write(Gif)
-        end,
+  end,
   normalize_return(mnesia:transaction(Fun)).
 
-retrieve_gifs(UserUUID) ->
+update_gif(GifId, Categories) ->
+  RetrieveGifFun = fun() ->
+    mnesia:read({gif, GifId})
+  end,
+  case mnesia:transaction(RetrieveGifFun) of
+    {atomic, [#gif{giphy_uri = GiphyURI, user_uuid = UserUUID}]} ->
+      insert_gif(GifId, GiphyURI, Categories, UserUUID);
+    {aborted, Reason} -> {error, Reason}
+  end.
+
+delete_gif(GifId) ->
+  Fun = fun() ->
+    mnesia:delete({gif, GifId})
+  end,
+  normalize_return(mnesia:transaction(Fun)).
+
+retrieve_gifs_by_user_id(UserUUID) ->
   Fun = fun() ->
     Query = qlc:q([Gif || Gif <- mnesia:table(gif),
       Gif#gif.user_uuid == UserUUID]),
-     qlc:e(Query)
-        end,
+    qlc:e(Query)
+  end,
   normalize_return(mnesia:transaction(Fun)).
 
 normalize_return({atomic, Value}) -> {ok, Value};

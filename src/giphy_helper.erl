@@ -42,7 +42,7 @@ body(Request, Acc) ->
 
   %% A quick way to seed the mnesia tables for testing. Returns the UserUUID you'll need to retrieve and save gifs
 seed_tables_for_testing() ->
-  {ok, ok} = giphy_table_mngr:insert_user(<<"Samwar">>, <<"test">>, <<"samwar@gmail.com">>, <<"test_uuid">>),
+  {ok, ok} = giphy_table_mngr:insert_user(<<"test_uuid">>, <<"Samwar">>, <<"test">>, <<"samwar@gmail.com">>),
   {ok, User} = giphy_table_mngr:retrieve_user(<<"Samwar">>, <<"test">>, true),
   UserUUID = User#user.uuid,
   giphy_table_mngr:insert_gif(iolist_to_binary([UserUUID, "_FiGiRei2ICzzG"]), <<"https://media2.giphy.com/media/FiGiRei2ICzzG/giphy.gif">>, [<<"funny">>, <<"cat">>, <<"roomba">>], UserUUID),

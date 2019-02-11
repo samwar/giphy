@@ -1,5 +1,6 @@
 -module(search_handler).
 -behavior(cowboy_rest).
+-include_lib("include/model/giphy_table_definitions.hrl").
 
 -export([init/2]).
 -export([content_types_provided/2]).
@@ -13,7 +14,10 @@ content_types_provided(Req, State) ->
 		{{<<"text">>, <<"html">>, '*'}, to_html}
 	], Req, State}.
 
-to_html(Req, State) ->
+%% Empty state match for testing.
+to_html(Req, []) ->
+	to_html(Req, #user{uuid = <<"test_uuid">>});
+to_html(Req, #user{uuid = UserId} = State) ->
 	Style = build_style(),
 	#{search := SearchString} = cowboy_req:match_qs([{search, [], <<>>}], Req),
 	SearchForm = build_search_form(SearchString),
@@ -21,8 +25,8 @@ to_html(Req, State) ->
 	SearchResults = do_giphy_search(FormattedSearchString),
 	% Reverse the map of images so after the recurssion they show up in the order that giphy served them up
 	Data = lists:reverse(maps:get(<<"data">>, SearchResults)),
-	SearchHTML = build_search_results(Data, [], <<"test_uuid">>),
-	{<<"<html><body>", Style/binary, SearchForm/binary, SearchHTML/binary,"</body></html>">>, Req, State}.
+	SearchHTML = build_search_results(Data, [], UserId),
+	{<<"<html><body>", Style/binary, SearchForm/binary, SearchHTML/binary,"\n</body></html>">>, Req, State}.
 
 build_style() -> <<"
 <style>
@@ -73,22 +77,27 @@ do_build_search_form(SearchString) -> <<"
 <form class=\"search\" action=\"/search\">
 <input type=\"text\" value=\"", SearchString/binary,"\" placeholder=\"Search..\" name=\"search\">
 <button type=\"submit\">Search</button>
-</form><br><br>">>.
+</form><br><br>\n">>.
 
-do_giphy_search(<<>>) -> #{<<"data">> => []};
+do_giphy_search(<<>>) -> #{<<"data">> => [no_search_results]};
 do_giphy_search(FormattedSearchString) ->
 	GiphyAPIKey = giphy_api_key(),
-	URL = binary_to_list(iolist_to_binary(["http://api.giphy.com/v1/gifs/search?q=", FormattedSearchString, "&api_key=",GiphyAPIKey,"&rating=g&limit=5"])),
+	URL = binary_to_list(iolist_to_binary(["http://api.giphy.com/v1/gifs/search?q=", FormattedSearchString, "&api_key=", GiphyAPIKey, "&rating=g&limit=6"])),
+	%% If giphy is down, this won't return a 200. It would be best to build some error handling here.
 	{ok, {{_Version, 200, _ReasonPhrase}, _Headers, Body}} = httpc:request(URL),
 	jiffy:decode(Body, [return_maps]).
 
-build_search_results([], HTML, _UserId) ->
-	iolist_to_binary(HTML);
-build_search_results([#{<<"id">> := GifId, <<"images">> := #{<<"original">> := #{<<"url">> := Url}}}| Rest], HTML, UserId) ->
+build_search_results([no_search_results], _HTML, _UserId) -> <<>>;
+build_search_results([], HTML, UserId) ->
+	iolist_to_binary([
+		"<form class=\"search\" action=\"/gifs/", UserId,"\" method=\"post\">\n",
+		HTML,
+		"<button type=\"submit\">Save</button>\n</form>"]);
+build_search_results([#{<<"id">> := GifId, <<"images">> := #{<<"original">> := #{<<"url">> := Url}}} | Rest], HTML, UserId) ->
 	UniqueGifId = <<UserId/binary, "_", GifId/binary>>,
 	ImageHTML = [
-		"<img id=\"", UniqueGifId, "\"src=\"", Url, "\" border=\"0\">",
-		"<input type=\"checkbox\" name=\"", UniqueGifId, "\" value=\"",Url, "\"><br>"
+		"<img id=\"", UniqueGifId, "\"src=\"", Url, "\" border=\"0\">\n",
+		"<input type=\"checkbox\" name=\"", UniqueGifId, "\" value=\"",Url, "\"><br>\n"
 	],
 	build_search_results(Rest, lists:append(ImageHTML, HTML), UserId).
 
