@@ -3,6 +3,8 @@
 src/gif_handler.erl:: src/include/model/giphy_table_definitions.hrl; @touch $@
 src/giphy_helper.erl:: src/include/model/giphy_table_definitions.hrl; @touch $@
 src/giphy_table_mngr.erl:: src/include/model/giphy_table_definitions.hrl; @touch $@
+src/login_handler.erl:: src/include/model/giphy_table_definitions.hrl; @touch $@
 src/search_handler.erl:: src/include/model/giphy_table_definitions.hrl; @touch $@
+src/user_handler.erl:: src/include/model/giphy_table_definitions.hrl; @touch $@
 
 COMPILE_FIRST +=

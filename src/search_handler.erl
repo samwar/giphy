@@ -21,76 +21,40 @@ resource_exists(Req, _State) ->
   UserUUID = cowboy_req:binding(user_uuid, Req),
   case giphy_table_mngr:retrieve_user_by_uuid(UserUUID) of
     {error, not_found} ->
-      RespBody = cowboy_req:set_resp_body(<<"User not found">>, Req),
+      HTML = <<"<html><body>User not found.\n<br><a href=\"/user\">Please make an account.</a></html></body>">>,
+      RespBody = cowboy_req:set_resp_body(HTML, Req),
       {false, RespBody, no_state};
     {ok, User} ->
       {true, Req, User}
   end.
 
 to_html(Req, #user{uuid = UserId} = State) ->
-  Style = build_style(),
-  #{search := SearchString} = cowboy_req:match_qs([{search, [], <<>>}], Req),
-  SearchForm = build_search_form(SearchString),
-  FormattedSearchString = binary:replace(SearchString, <<" ">>, <<"+">>, [global]),
-  SearchResults = do_giphy_search(FormattedSearchString),
+  Style = giphy_helper:build_search_and_filter_style(),
+  UserProfileLink = build_user_profile_link(State),
+  #{search := SearchString} = cowboy_req:match_qs([{search, [], no_search_string}], Req),
+  SearchForm = build_search_form(SearchString, UserId),
+  SearchResults = do_giphy_search(SearchString),
   % Reverse the map of images so after the recurssion they show up in the order that giphy served them up
   Data = lists:reverse(maps:get(<<"data">>, SearchResults)),
   SearchHTML = build_search_results(Data, [], UserId),
-  {<<"<html><body>", Style/binary, SearchForm/binary, SearchHTML/binary, "\n</body></html>">>, Req, State}.
+  {<<"<html><body>", UserProfileLink/binary, Style/binary, SearchForm/binary, SearchHTML/binary, "\n</body></html>">>,
+    Req, State}.
 
-build_style() -> <<"
-<style>
-body {
-  font-family: Arial;
-}
+build_user_profile_link(#user{username = Username, uuid = UserUUID}) ->
+  <<"<h3><a href=\"/gifs/", UserUUID/binary, "\">", Username/binary, "'s favorite gifs</a></h3>\n">>.
 
-* {
-  box-sizing: border-box;
-}
+build_search_form(no_search_string, UserUUID) -> do_build_search_form(<<>>, UserUUID);
+build_search_form(SearchString, UserUUID) -> do_build_search_form(SearchString, UserUUID).
 
-form.search input[type=text] {
-  padding: 10px;
-  font-size: 17px;
-  border: 1px solid grey;
-  float: left;
-  width: 80%;
-  background: #f1f1f1;
-}
-
-form.search button {
-  float: left;
-  width: 20%;
-  padding: 10px;
-  background: #2196F3;
-  color: white;
-  font-size: 17px;
-  border: 1px solid grey;
-  border-left: none;
-  cursor: pointer;
-}
-
-form.search button:hover {
-  background: #0b7dda;
-}
-
-form.search::after {
-  content: "";
-  clear: both;
-  display: table;
-}
-</style>">>.
-
-build_search_form(<<>>) -> do_build_search_form(<<>>);
-build_search_form(SearchString) -> do_build_search_form(SearchString).
-
-do_build_search_form(SearchString) -> <<"
-<form class=\"search\" action=\"/search\">
-<input type=\"text\" value=\"", SearchString/binary, "\" placeholder=\"Search..\" name=\"search\">
+do_build_search_form(SearchString, UserUUID) -> <<"
+<form class=\"search\" action=\"/search/", UserUUID/binary,"\">
+<input type=\"text\" value=\"", SearchString/binary, "\" placeholder=\"Search Giphy..\" name=\"search\">
 <button type=\"submit\">Search</button>
 </form><br><br>\n">>.
 
-do_giphy_search(<<>>) -> #{<<"data">> => [no_search_results]};
-do_giphy_search(FormattedSearchString) ->
+do_giphy_search(no_search_string) -> #{<<"data">> => [no_search_results]};
+do_giphy_search(SearchString) ->
+  FormattedSearchString = binary:replace(SearchString, <<" ">>, <<"+">>, [global]),
   GiphyAPIKey = giphy_api_key(),
   URL = binary_to_list(iolist_to_binary(["http://api.giphy.com/v1/gifs/search?q=", FormattedSearchString, "&api_key=", GiphyAPIKey, "&rating=g&limit=6"])),
   %% If giphy is down, this won't return a 200. It would be best to build some error handling here.
@@ -106,7 +70,7 @@ build_search_results([], HTML, UserId) ->
 build_search_results([#{<<"id">> := GifId, <<"images">> := #{<<"original">> := #{<<"url">> := Url}}} | Rest], HTML, UserId) ->
   UniqueGifId = <<UserId/binary, "_", GifId/binary>>,
   ImageHTML = [
-    "<img id=\"", UniqueGifId, "\"src=\"", Url, "\" border=\"0\">\n",
+    "<img id=\"", UniqueGifId, "\"src=\"", Url, "\" border=\"\">\n",
     "<input type=\"checkbox\" name=\"", UniqueGifId, "\" value=\"", Url, "\"><br>\n"
   ],
   build_search_results(Rest, lists:append(ImageHTML, HTML), UserId).

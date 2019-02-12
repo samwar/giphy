@@ -34,18 +34,23 @@ resource_exists(Req, _State) ->
   UserUUID = cowboy_req:binding(user_uuid, Req),
   case giphy_table_mngr:retrieve_user_by_uuid(UserUUID) of
     {error, not_found} ->
-      RespBody = cowboy_req:set_resp_body(<<"User not found">>, Req),
+      HTML = <<"<html><body>User not found.\n<br><a href=\"/user\">Please make an account.</a></html></body>">>,
+      RespBody = cowboy_req:set_resp_body(HTML, Req),
       {false, RespBody, no_state};
     {ok, User} ->
       {true, Req, User}
   end.
 
 to_html(Req, #user{uuid = UserUUID} = User) ->
-  {ok, Gifs} = giphy_table_mngr:retrieve_gifs_by_user_id(UserUUID),
+  #{filter := FilterString} = cowboy_req:match_qs([{filter, [], no_filter}], Req),
+  Style = giphy_helper:build_search_and_filter_style(),
   UserHTML = build_user_html(User),
+  SearchForm = build_search_form(FilterString, UserUUID),
+  {ok, Gifs} = find_gifs(FilterString, UserUUID),
   % Reverse the list of gifs so they are displayed in the order the user saved them
   GifHTML = build_gif_html(lists:reverse(Gifs), [], UserUUID, length(Gifs)),
-  {<<"<html><body>\n", UserHTML/binary, "\n", GifHTML/binary, "\n</body></html>">>, Req, User}.
+  {<<"<html><body>\n", Style/binary, "\n", UserHTML/binary, SearchForm/binary, GifHTML/binary, "\n</body></html>">>,
+    Req, User}.
 
 from_json(Request, _State) ->
   {ok, #{<<"user_uuid">> := UserUUID, <<"gifs">> := Gifs}, Response} = giphy_helper:body(Request, <<>>),
@@ -54,8 +59,23 @@ from_json(Request, _State) ->
   {true, Response, _State}.
 
 build_user_html(#user{username = Username, uuid = UserUUID}) ->
-  <<"<h1>", Username/binary, "'s favorite gifs!</h1>\n",
-    "<h3><a href=\"/search/", UserUUID, "\">Search for gifs!</a></h3>">>.
+  iolist_to_binary(["<h1>", Username, "'s favorite gifs!</h1>\n",
+    "<h3><a href=\"/search/", UserUUID, "\">Search for gifs!</a></h3>\n"]).
+
+build_search_form(no_filter, UserUUID) ->
+  do_build_search_form(<<>>, UserUUID);
+build_search_form(SearchString, UserUUID) ->
+  do_build_search_form(SearchString, UserUUID).
+
+do_build_search_form(SearchString, UserUUID) -> <<"
+<form class=\"filter\" action=\"/gifs/", UserUUID/binary,"\">
+<input type=\"text\" value=\"", SearchString/binary, "\" placeholder=\"Filter favorite gifs by category..\" name=\"filter\">
+<button type=\"submit\">Filter</button>
+</form>
+<form class=\"filter\" action=\"/gifs/", UserUUID/binary,"\">
+<button type=\"submit\">Clear Filter</button>
+</form><br><br>\n"
+>>.
 
 %% Builds the html to display the gifs. If there are non retrieved from the database, don't build anything.
 build_gif_html([], _HTML, _UserId, 0) -> <<>>;
@@ -72,8 +92,8 @@ build_gif_html([#gif{gif_id = GifId, giphy_uri = URI, categories = Categories} |
     [
       "<img id=\"", GifId, "\" src=\"", URI, "\" border=\"0\"><br>\n",
       "<label for=\"", GifId, "\">Categories:</label>\n",
-      "<input type=\"text\" name=\"", GifId, "\" id=\"", GifId, "\" value=\"", CategoriesString, "\">\n"
-    "<input type=\"checkbox\" name=\"", GifId, "\">Delete<br>\n"
+      "<input type=\"text\" name=\"", GifId, "\" id=\"", GifId, "\" value=\"", CategoriesString, "\"placeholder=\"raining, cats, dogs\">\n"
+      "<input type=\"checkbox\" name=\"", GifId, "\">Delete<br>\n"
     ],
   build_gif_html(Rest, lists:append(NewHTML, HTML), UserId, InitialGifCount).
 
@@ -87,6 +107,12 @@ from_form(Request, #user{uuid = UserId} = State) ->
   {ok, FormData, _Req} = cowboy_req:read_urlencoded_body(Request),
   update_save_or_delete_gifs(FormData, UserId),
   {{true, <<"/gifs/", UserId/binary>>}, Request, State}.
+
+find_gifs(no_filter, UserUUID) ->
+  giphy_table_mngr:retrieve_gifs_by_user_id(UserUUID);
+find_gifs(FilterString, UserUUID) ->
+  Categories = binary:split(FilterString, <<" ">>),
+  giphy_table_mngr:retrieve_gifs_by_categories(UserUUID, Categories).
 
 update_save_or_delete_gifs([{<<"_method">>, <<"put">>} | FormData], _UserId) ->
   [update_or_delete_gif(Data) || Data <- FormData];

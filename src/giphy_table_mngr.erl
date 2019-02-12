@@ -21,7 +21,8 @@
   insert_gif/4,
   update_gif/2,
   delete_gif/1,
-  retrieve_gifs_by_user_id/1
+  retrieve_gifs_by_user_id/1,
+  retrieve_gifs_by_categories/2
 ]).
 
 
@@ -47,7 +48,7 @@ insert_user(UUID, Username, Password, Email) ->
   User = #user{
     uuid = UUID,
     username = Username,
-    password = base64:encode(Password), % SUPER DUPER secure base64 encoding
+    password = base64:encode(Password), % SUPER DUPER secure base64 encoding. Lolz.
     email = Email
   },
   Fun = fun() ->
@@ -122,8 +123,23 @@ retrieve_gifs_by_user_id(UserUUID) ->
   end,
   normalize_return(mnesia:transaction(Fun)).
 
+retrieve_gifs_by_categories(UserUUID, Categories) ->
+  Fun = fun() ->
+    Query = qlc:q([Gif || Gif <- mnesia:table(gif),
+      (Gif#gif.user_uuid == UserUUID) andalso match_categories(Categories, Gif#gif.categories, false)]),
+    qlc:e(Query)
+  end,
+  normalize_return(mnesia:transaction(Fun)).
+
+match_categories([], _GifCategories, MatchAcc) ->
+  MatchAcc;
+match_categories([FilterCategory | FilterCategories], GifCategories, MatchAcc) ->
+  MatchingCategories = [re:run(GifCategory, FilterCategory, [{capture, none}]) == match || GifCategory <- GifCategories],
+  Fun = fun(Match, Acc) -> Match orelse Acc end,
+  NewMatchAcc = lists:foldl(Fun, MatchAcc, MatchingCategories),
+  match_categories(FilterCategories, GifCategories, NewMatchAcc).
+
 normalize_return({atomic, Value}) -> {ok, Value};
 normalize_return({aborted, Reason}) ->
   lager:error("Database error: ~p", [{error, Reason}]),
   {error, Reason}.
-
