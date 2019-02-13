@@ -26,7 +26,6 @@ content_types_provided(Req, State) ->
 
 content_types_accepted(Req, State) ->
   {[
-    {{<<"application">>, <<"json">>, '*'}, from_json},
     {{<<"application">>, <<"x-www-form-urlencoded">>, '*'}, from_form}
   ], Req, State}.
 
@@ -51,12 +50,6 @@ to_html(Req, #user{uuid = UserUUID} = User) ->
   GifHTML = build_gif_html(lists:reverse(Gifs), [], UserUUID, length(Gifs)),
   {<<"<html><body>\n", Style/binary, "\n", NavBarHTML/binary, SearchForm/binary, GifHTML/binary, "\n</body></html>">>,
     Req, User}.
-
-from_json(Request, _State) ->
-  {ok, #{<<"user_uuid">> := UserUUID, <<"gifs">> := Gifs}, Response} = giphy_helper:body(Request, <<>>),
-  [giphy_table_mngr:insert_gif(GiphyURI, Categories, UserUUID)
-    || #{<<"url">> := GiphyURI, <<"categories">> := Categories} <- Gifs],
-  {true, Response, _State}.
 
 build_navbar_html(#user{username = Username, uuid = UserUUID}) ->
   iolist_to_binary([

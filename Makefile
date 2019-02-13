@@ -7,6 +7,8 @@ dep_cowboy_commit = 2.6.1
 
 DEP_PLUGINS = cowboy
 
+EUNIT_OPTS = verbose
+
 # this must be first
 include erlang.mk
 
