@@ -79,7 +79,7 @@ build_search_results([#{<<"id">> := GifId, <<"images">> := #{<<"original">> := #
   UniqueGifId = <<UserId/binary, "_", GifId/binary>>,
   ImageHTML = [
     "<div class=\"container\">\n"
-    "<img id=\"", UniqueGifId, "\"src=\"", Url, "\">\n",
+    "<img id=\"", UniqueGifId, "\"src=\"", Url, "\"><br>\n",
     "<input type=\"checkbox\" name=\"", UniqueGifId, "\" value=\"", Url, "\">Add to favorites\n"
     "</div>\n"
   ],

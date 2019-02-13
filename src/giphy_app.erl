@@ -21,7 +21,7 @@ start(_Type, _Args) ->
 	),
 	start_mnesia(),
 	lager:start(),
-	giphy_table_mngr:seed_tables_for_testing(),
+%%	giphy_table_mngr:seed_tables_for_testing(),
 	giphy_sup:start_link().
 
 stop(_State) ->
