@@ -27,6 +27,12 @@
   seed_tables_for_testing/0
 ]).
 
+-ifdef(TEST).
+-export([
+  match_categories/3,
+  do_retrieve_user/3
+]).
+-endif.
 
 create_tables() ->
   % Create the user table, build an index on username and uuid
