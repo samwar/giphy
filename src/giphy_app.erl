@@ -1,8 +1,10 @@
 -module(giphy_app).
 -behaviour(application).
 
--export([start/2]).
--export([stop/1]).
+-export([
+	start/2,
+	stop/1
+]).
 
 start(_Type, _Args) ->
 	Dispatch = cowboy_router:compile([
@@ -19,7 +21,7 @@ start(_Type, _Args) ->
 	),
 	start_mnesia(),
 	lager:start(),
-	giphy_helper:seed_tables_for_testing(),
+	giphy_table_mngr:seed_tables_for_testing(),
 	giphy_sup:start_link().
 
 stop(_State) ->

@@ -30,27 +30,35 @@ resource_exists(Req, _State) ->
 
 to_html(Req, #user{uuid = UserId} = State) ->
   Style = giphy_helper:build_search_and_filter_style(),
-  UserProfileLink = build_user_profile_link(State),
+  NavBarHTML = build_navbar_html(State),
   #{search := SearchString} = cowboy_req:match_qs([{search, [], no_search_string}], Req),
   SearchForm = build_search_form(SearchString, UserId),
   SearchResults = do_giphy_search(SearchString),
   % Reverse the map of images so after the recurssion they show up in the order that giphy served them up
   Data = lists:reverse(maps:get(<<"data">>, SearchResults)),
   SearchHTML = build_search_results(Data, [], UserId),
-  {<<"<html><body>", UserProfileLink/binary, Style/binary, SearchForm/binary, SearchHTML/binary, "\n</body></html>">>,
+  {<<"<html>\n<body>\n", NavBarHTML/binary, Style/binary, SearchForm/binary, SearchHTML/binary, "\n</body>\n</html>">>,
     Req, State}.
 
-build_user_profile_link(#user{username = Username, uuid = UserUUID}) ->
-  <<"<h3><a href=\"/gifs/", UserUUID/binary, "\">", Username/binary, "'s favorite gifs</a></h3>\n">>.
+build_navbar_html(#user{username = Username, uuid = UserUUID}) ->
+  iolist_to_binary([
+    "<div class=\"topnav\">\n",
+    "\t<a href=\"/gifs/", UserUUID, "\">", string:titlecase(Username), "'s Favorite Gifs</a>\n",
+    "\t<a class=\"active\" href=\"#search_giphy\">Search GIPHY</a>\n",
+    "\t<a href=\"/\">Log Out</a>\n",
+    "</div>"
+  ]).
 
 build_search_form(no_search_string, UserUUID) -> do_build_search_form(<<>>, UserUUID);
 build_search_form(SearchString, UserUUID) -> do_build_search_form(SearchString, UserUUID).
 
 do_build_search_form(SearchString, UserUUID) -> <<"
-<form class=\"search\" action=\"/search/", UserUUID/binary,"\">
-<input type=\"text\" value=\"", SearchString/binary, "\" placeholder=\"Search Giphy..\" name=\"search\">
-<button type=\"submit\">Search</button>
-</form><br><br>\n">>.
+<div>
+  <form class=\"search\" action=\"/search/", UserUUID/binary,"\">
+    <input type=\"text\" value=\"", SearchString/binary, "\" placeholder=\"Search Giphy..\" name=\"search\">
+    <button type=\"submit\">Search</button>
+  </form>
+</div>">>.
 
 do_giphy_search(no_search_string) -> #{<<"data">> => [no_search_results]};
 do_giphy_search(SearchString) ->
@@ -70,8 +78,10 @@ build_search_results([], HTML, UserId) ->
 build_search_results([#{<<"id">> := GifId, <<"images">> := #{<<"original">> := #{<<"url">> := Url}}} | Rest], HTML, UserId) ->
   UniqueGifId = <<UserId/binary, "_", GifId/binary>>,
   ImageHTML = [
-    "<img id=\"", UniqueGifId, "\"src=\"", Url, "\" border=\"\">\n",
-    "<input type=\"checkbox\" name=\"", UniqueGifId, "\" value=\"", Url, "\"><br>\n"
+    "<div class=\"container\">\n"
+    "<img id=\"", UniqueGifId, "\"src=\"", Url, "\">\n",
+    "<input type=\"checkbox\" name=\"", UniqueGifId, "\" value=\"", Url, "\">Add to favorites\n"
+    "</div>\n"
   ],
   build_search_results(Rest, lists:append(ImageHTML, HTML), UserId).
 

@@ -22,7 +22,9 @@
   update_gif/2,
   delete_gif/1,
   retrieve_gifs_by_user_id/1,
-  retrieve_gifs_by_categories/2
+  retrieve_gifs_by_categories/2,
+  uuid_v4/0,
+  seed_tables_for_testing/0
 ]).
 
 
@@ -43,11 +45,11 @@ insert_user(Username, Password, Email) ->
   insert_user(undefined, Username, Password, Email).
 
 insert_user(undefined, Username, Password, Email) ->
-  insert_user(list_to_binary(giphy_helper:uuid_v4()), Username, Password, Email);
+  insert_user(list_to_binary(uuid_v4()), Username, Password, Email);
 insert_user(UUID, Username, Password, Email) ->
   User = #user{
     uuid = UUID,
-    username = Username,
+    username = string:lowercase(Username), % Make all usernames case insensitive
     password = base64:encode(Password), % SUPER DUPER secure base64 encoding. Lolz.
     email = Email
   },
@@ -59,7 +61,7 @@ insert_user(UUID, Username, Password, Email) ->
 retrieve_user(Username, Password, AuthCheck) ->
   Fun = fun() ->
     Query = qlc:q([User || User <- mnesia:table(user),
-      User#user.username == Username]),
+      User#user.username == string:lowercase(Username)]), % Search for usernames in a case insensitive manner
     qlc:e(Query)
   end,
   do_retrieve_user(mnesia:transaction(Fun), Password, AuthCheck).
@@ -143,3 +145,26 @@ normalize_return({atomic, Value}) -> {ok, Value};
 normalize_return({aborted, Reason}) ->
   lager:error("Database error: ~p", [{error, Reason}]),
   {error, Reason}.
+
+%% Creates a version 4 UUID string, which is randomly generated and looks
+%% like "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", where the x's are hex digits,
+%% the 4 is constant, and y is special because its first two bits are 10 to
+%% indicate the "variant".
+%% See http://en.wikipedia.org/wiki/Universally_unique_identifier
+-spec uuid_v4() -> string().
+uuid_v4() ->
+  % Remember: bin matching counts by bits by default...
+  <<A:32, B:16, _:4, C:12, _:2, D:14, E:48>> = crypto:strong_rand_bytes(16),
+  CWithVersion = C bor 16#4000, % Insert version == 4
+  DWithVariant = D bor 16#8000, % Insert variant == 1,0 as first two bits
+  FormatString = "~8.16.0b-~4.16.0b-~4.16.0b-~4.16.0b-~12.16.0b",
+  lists:flatten(io_lib:format(FormatString, [A, B, CWithVersion, DWithVariant, E])).
+
+%% A quick way to seed the mnesia tables for testing. Returns the UserUUID you'll need to retrieve and save gifs
+seed_tables_for_testing() ->
+  {ok, ok} = insert_user(<<"test_uuid">>, <<"Samwar">>, <<"test">>, <<"samwar@gmail.com">>),
+  {ok, User} = retrieve_user(<<"Samwar">>, <<"test">>, true),
+  UserUUID = User#user.uuid,
+  insert_gif(iolist_to_binary([UserUUID, "_FiGiRei2ICzzG"]), <<"https://media2.giphy.com/media/FiGiRei2ICzzG/giphy.gif">>, [<<"funny">>, <<"cat">>, <<"roomba">>], UserUUID),
+  insert_gif(iolist_to_binary([UserUUID, "_feqkVgjJpYtjy"]), <<"https://media0.giphy.com/media/feqkVgjJpYtjy/giphy.gif">>, [<<"bird">>, <<"zoom">>], UserUUID),
+  UserUUID.

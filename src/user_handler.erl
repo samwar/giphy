@@ -27,16 +27,15 @@ content_types_accepted(Req, State) ->
     Req, State}.
 
 to_html(Req, State) ->
-  {create_user_html(), Req, State}.
+  {create_user_html(<<>>), Req, State}.
 
 create_user_from_form(Req, _State) ->
   {ok, FormData, _Req0} = cowboy_req:read_urlencoded_body(Req),
   [{<<"username">>, Username}, {<<"password">>, Password}, {<<"email">>, Email}] = FormData,
-  {ok, ok} = giphy_table_mngr:insert_user(Username, Password, Email),
-  {ok, #user{uuid = UserUUID} = User} = giphy_table_mngr:retrieve_user(Username, Password, true),
-  {{true, <<"gifs/", UserUUID/binary>>}, Req, User}.
+  CreateUserResult = create_user(Username, Password, Email),
+  navigate_to_profile_or_return_error(CreateUserResult, Req).
 
-create_user_html() ->
+create_user_html(ErrorMessage) ->
   Style = giphy_helper:build_login_user_style(),
   <<"<html><body>",
     Style/binary,"
@@ -50,6 +49,26 @@ create_user_html() ->
   <label for=\"email\"><b>Email</b></label>
   <input type=\"text\" name=\"email\" placeholder=\"Enter Email Address\" required><br>
   <button type=\"submit\">Create Account</button>
+  <p>", ErrorMessage/binary, "</p>
+  <a href=\"/\">Already have an account?</a>
 </form>
 </div>
 </body></html>">>.
+
+%% Checks to see if a user with the username already exists. If it does, return an error
+%% or else create the user and move onto the search page to start adding gifs
+create_user(Username, Password, Email) ->
+  case giphy_table_mngr:retrieve_user(Username, undefined, false) of
+    {ok, #user{}} ->
+      {error, {username_exists, <<"This username already exists">>}};
+    {error, not_found} ->
+      {ok, ok} = giphy_table_mngr:insert_user(Username, Password, Email),
+      giphy_table_mngr:retrieve_user(Username, Password, true)
+  end.
+
+navigate_to_profile_or_return_error({error, {username_exists, ErrorMessage}}, Req) ->
+  {true, cowboy_req:reply(401, #{
+    <<"content-type">> => <<"text/html">>
+  }, [create_user_html(ErrorMessage)], Req), []};
+navigate_to_profile_or_return_error({ok, #user{uuid = UserUUID} = User}, Req) ->
+  {{true, <<"search/", UserUUID/binary>>}, Req, User}.

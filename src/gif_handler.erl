@@ -44,12 +44,12 @@ resource_exists(Req, _State) ->
 to_html(Req, #user{uuid = UserUUID} = User) ->
   #{filter := FilterString} = cowboy_req:match_qs([{filter, [], no_filter}], Req),
   Style = giphy_helper:build_search_and_filter_style(),
-  UserHTML = build_user_html(User),
+  NavBarHTML = build_navbar_html(User),
   SearchForm = build_search_form(FilterString, UserUUID),
   {ok, Gifs} = find_gifs(FilterString, UserUUID),
   % Reverse the list of gifs so they are displayed in the order the user saved them
   GifHTML = build_gif_html(lists:reverse(Gifs), [], UserUUID, length(Gifs)),
-  {<<"<html><body>\n", Style/binary, "\n", UserHTML/binary, SearchForm/binary, GifHTML/binary, "\n</body></html>">>,
+  {<<"<html><body>\n", Style/binary, "\n", NavBarHTML/binary, SearchForm/binary, GifHTML/binary, "\n</body></html>">>,
     Req, User}.
 
 from_json(Request, _State) ->
@@ -58,9 +58,14 @@ from_json(Request, _State) ->
     || #{<<"url">> := GiphyURI, <<"categories">> := Categories} <- Gifs],
   {true, Response, _State}.
 
-build_user_html(#user{username = Username, uuid = UserUUID}) ->
-  iolist_to_binary(["<h1>", Username, "'s favorite gifs!</h1>\n",
-    "<h3><a href=\"/search/", UserUUID, "\">Search for gifs!</a></h3>\n"]).
+build_navbar_html(#user{username = Username, uuid = UserUUID}) ->
+  iolist_to_binary([
+    "<div class=\"topnav\">\n",
+    "\t<a class=\"active\" href=\"#favorite_gifs\">", string:titlecase(Username), "'s Favorite Gifs</a>\n",
+    "\t<a href=\"/search/", UserUUID, "\">Search GIPHY</a>\n",
+    "\t<a href=\"/\">Log Out</a>\n",
+    "</div>"
+  ]).
 
 build_search_form(no_filter, UserUUID) ->
   do_build_search_form(<<>>, UserUUID);
@@ -68,13 +73,15 @@ build_search_form(SearchString, UserUUID) ->
   do_build_search_form(SearchString, UserUUID).
 
 do_build_search_form(SearchString, UserUUID) -> <<"
-<form class=\"filter\" action=\"/gifs/", UserUUID/binary,"\">
-<input type=\"text\" value=\"", SearchString/binary, "\" placeholder=\"Filter favorite gifs by category..\" name=\"filter\">
-<button type=\"submit\">Filter</button>
-</form>
-<form class=\"filter\" action=\"/gifs/", UserUUID/binary,"\">
-<button type=\"submit\">Clear Filter</button>
-</form><br><br>\n"
+<div>
+  <form class=\"filter\" action=\"/gifs/", UserUUID/binary,"\">
+    <input type=\"text\" value=\"", SearchString/binary, "\" placeholder=\"Filter favorite gifs by category..\" name=\"filter\">
+    <button type=\"submit\">Filter</button>
+  </form>
+  <form class=\"filter\" action=\"/gifs/", UserUUID/binary,"\">
+    <button type=\"submit\">Clear Filter</button>
+  </form>
+</div>"
 >>.
 
 %% Builds the html to display the gifs. If there are non retrieved from the database, don't build anything.
@@ -90,10 +97,12 @@ build_gif_html([#gif{gif_id = GifId, giphy_uri = URI, categories = Categories} |
   CategoriesString = categories_string(Categories),
   NewHTML =
     [
-      "<img id=\"", GifId, "\" src=\"", URI, "\" border=\"0\"><br>\n",
+      "<div class=\"container\">\n"
+      "<img id=\"", GifId, "\" src=\"", URI, "\"><br>\n",
       "<label for=\"", GifId, "\">Categories:</label>\n",
-      "<input type=\"text\" name=\"", GifId, "\" id=\"", GifId, "\" value=\"", CategoriesString, "\"placeholder=\"raining, cats, dogs\">\n"
+      "<input type=\"text\" name=\"", GifId, "\" id=\"", GifId, "\" value=\"", CategoriesString, "\"placeholder=\"ex: raining, cats, dogs, small animals\">\n"
       "<input type=\"checkbox\" name=\"", GifId, "\">Delete<br>\n"
+      "</div>\n"
     ],
   build_gif_html(Rest, lists:append(NewHTML, HTML), UserId, InitialGifCount).
 
