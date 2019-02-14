@@ -9,7 +9,6 @@
   content_types_accepted/2,
   resource_exists/2,
   to_html/2,
-  from_json/2,
   from_form/2
 ]).
 
@@ -42,7 +41,7 @@ resource_exists(Req, _State) ->
 
 to_html(Req, #user{uuid = UserUUID} = User) ->
   #{filter := FilterString} = cowboy_req:match_qs([{filter, [], no_filter}], Req),
-  Style = giphy_helper:build_search_and_filter_style(),
+  Style = giphy_request_helper:build_search_and_filter_style(),
   NavBarHTML = build_navbar_html(User),
   SearchForm = build_search_form(FilterString, UserUUID),
   {ok, Gifs} = find_gifs(FilterString, UserUUID),

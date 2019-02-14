@@ -36,7 +36,7 @@ create_user_from_form(Req, _State) ->
   navigate_to_profile_or_return_error(CreateUserResult, Req).
 
 create_user_html(ErrorMessage) ->
-  Style = giphy_helper:build_login_user_style(),
+  Style = giphy_request_helper:build_login_user_style(),
   <<"<html><body>",
     Style/binary,"
 <form action=\"/user\" method=\"post\">

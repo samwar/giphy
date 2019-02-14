@@ -29,7 +29,7 @@ resource_exists(Req, _State) ->
   end.
 
 to_html(Req, #user{uuid = UserId} = State) ->
-  Style = giphy_helper:build_search_and_filter_style(),
+  Style = giphy_request_helper:build_search_and_filter_style(),
   NavBarHTML = build_navbar_html(State),
   #{search := SearchString} = cowboy_req:match_qs([{search, [], no_search_string}], Req),
   SearchForm = build_search_form(SearchString, UserId),
